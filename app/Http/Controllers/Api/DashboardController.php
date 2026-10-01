@@ -43,11 +43,16 @@ class DashboardController extends Controller
             ->reverse()
             ->values();
 
-        // strftime() is SQLite-only — swap for DATE_FORMAT() if the DB connection changes.
+        // Month-grouping expression differs per driver (sqlite locally, pgsql in production).
+        $monthExpr = match ($user->tasks()->getConnection()->getDriverName()) {
+            'pgsql' => "to_char(COALESCE(tasks.completed_at, tasks.updated_at), 'YYYY-MM')",
+            'mysql', 'mariadb' => "DATE_FORMAT(COALESCE(tasks.completed_at, tasks.updated_at), '%Y-%m')",
+            default => "strftime('%Y-%m', COALESCE(tasks.completed_at, tasks.updated_at))",
+        };
+
         $earningsByMonth = $user->tasks()
             ->selectRaw(
-                "strftime('%Y-%m', COALESCE(tasks.completed_at, tasks.updated_at)) as month, ".
-                'SUM(tasks.actual_hours * COALESCE(projects.hourly_rate, ?)) as earnings',
+                "{$monthExpr} as month, SUM(tasks.actual_hours * COALESCE(projects.hourly_rate, ?)) as earnings",
                 [$user->hourly_rate]
             )
             ->whereBetween(DB::raw('COALESCE(tasks.completed_at, tasks.updated_at)'), [now()->subMonths(5)->startOfMonth(), now()->endOfMonth()])
