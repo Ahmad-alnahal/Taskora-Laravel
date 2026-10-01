@@ -14,9 +14,12 @@ fi
 envsubst '${PORT}' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf
 
 php artisan config:cache
+
+php artisan migrate --force
+
 php artisan route:cache
 php artisan view:cache
 
-chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database
 
 exec supervisord -c /etc/supervisor/supervisord.conf

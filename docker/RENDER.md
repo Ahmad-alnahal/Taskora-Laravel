@@ -1,11 +1,8 @@
 # Render deployment notes
 
-Not executed yet — Render account is locked out (see project memory,
-`portfolio-infra-plan.md`, Phase 3). This documents the settings to apply
-once access is restored and `taskora-db` (Supabase Postgres) is wired up.
-
 ## Service type
 Web Service, Docker runtime, this repo's `Dockerfile` at the project root.
+Free instance type.
 
 ## Environment variables (Render's own secrets store, never a committed `.env`)
 - `APP_KEY` — generate with `php artisan key:generate --show`
@@ -13,18 +10,18 @@ Web Service, Docker runtime, this repo's `Dockerfile` at the project root.
 - `APP_DEBUG=false`
 - `APP_URL` — the Render-issued service URL
 - `DB_CONNECTION=pgsql`
-- `DB_HOST`, `DB_PORT=5432`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` — from the `taskora-db` Supabase project's connection info
+- `DB_HOST`, `DB_PORT=5432`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` — the Supabase **Session pooler** connection parameters for `taskora-db` (not the Direct connection host — Render's network is IPv4-only, and Supabase's Direct host is IPv6-only by default). `DB_USERNAME` includes the project ref suffix (`postgres.<project-ref>`).
 - `DB_SSLMODE=require`
 - `LOG_CHANNEL=stack`, `LOG_LEVEL=error`
 - `SESSION_DRIVER=database`, `CACHE_STORE=database`, `QUEUE_CONNECTION=database`
 
-## Pre-Deploy Command
-```
-php artisan migrate --force
-```
-Runs against `taskora-db` before each new deploy goes live. Do not run this
-locally against the real database — only inside Render, after `DB_*` env
-vars point at the real `taskora-db` instance.
+## Migrations
+Render's Free instance type does not support Pre-Deploy Command or SSH
+access (both are paid-plan only), so `docker/entrypoint.sh` runs
+`php artisan migrate --force` itself on every container boot, right after
+`config:cache`. This also re-applies on a Free-tier wake-from-sleep
+restart, not just on a fresh deploy — safe, since Laravel only runs
+migrations that haven't been applied yet.
 
 ## Deploy trigger
 GitHub-connected auto-deploy, restricted to `main`.
